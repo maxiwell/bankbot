@@ -1,0 +1,5 @@
+__pycache__
+real_*
+.auth
+*.ofx
+config.json

@@ -1,0 +1,6 @@
+playwright
+pathvalidate
+click
+flask
+python-daemon
+chardet
