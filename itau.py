@@ -103,10 +103,11 @@ class Itau(BankBot):
                 item.click()
                 break
 
-        page.wait_for_load_state('networkidle')
+        #page.wait_for_load_state('networkidle')
 
 
     def __get_ofx(self, page):
+        page.get_by_role("button", name="salvar como").wait_for()
         page.get_by_role("button", name="salvar como").click()
 
         # Start waiting for the download
@@ -125,10 +126,10 @@ class Itau(BankBot):
         page.get_by_role("link", name="cartões").click()
 
         time.sleep(random.randint(1,3))
-        page.locator("#detalharCartao1").click()
+        #page.locator("#detalharCartao0").click()
 
         time.sleep(random.randint(1,3))
-        page.locator("#conteudo1").get_by_role("link", name="ver fatura").click()
+        page.locator("#conteudo0").get_by_role("link", name="ver fatura").click()
 
         time.sleep(random.randint(4,7))
 
@@ -137,19 +138,20 @@ class Itau(BankBot):
         with page.expect_download() as download_info:
 
             page.get_by_role("button", name="salvar em Excel").first.click()
+            #page.get_by_role("button", name="salvar planilha").click()
 
-            filename = self.ofx_dir + "/" + self.create_filename("_mar.xlsx")
+            filename = self.ofx_dir + "/" + self.create_filename(".xlsx")
             self.save_file_from_page(download_info, filename)
 
-        # Mes Anterior
-        page.get_by_role("tab", name="fevereiro: Fatura fechada R$").click()
-        page.locator("#botao-opcoes-lancamentos").click()
+        ## Mes Anterior
+        #page.get_by_role("tab", name="fevereiro: Fatura fechada R$").click()
+        #page.locator("#botao-opcoes-lancamentos").click()
 
-        with page.expect_download() as download_info:
-            page.get_by_role("button", name="salvar em Excel").first.click()
+        #with page.expect_download() as download_info:
+        #    page.get_by_role("button", name="salvar em Excel").first.click()
 
-            filename = self.ofx_dir + "/" + self.create_filename("_fev.xlsx")
-            self.save_file_from_page(download_info, filename)
+        #    filename = self.ofx_dir + "/" + self.create_filename("_fev.xlsx")
+        #    self.save_file_from_page(download_info, filename)
 
     def exit(self, page):
         page.get_by_role("button", name=" sair").click()
@@ -178,18 +180,18 @@ class Itau(BankBot):
         self.log("Exiting")
         self.exit(page)
 
-        return self.json_return(Status.OK, "Task Completed", ofx)
+        return self.json_return(Status.OK, "Task Completed")
 
 @click.command()
 @click.option('-h', '--headless', default=False, is_flag=True, help='Run in headless mode')
-def command(headless):
+@click.option('-d', '--debug', default=False, is_flag=True, help='Run in debug mode')
+def command(headless, debug):
     with open('config.json', 'r') as f:
         config = json.load(f)
 
-    bot = Itau(headless = headless)
+    bot = Itau(headless = headless, debug = debug)
 
     ret = bot.start(config.get("itau"))
-    print(ret)
 
 if __name__ == "__main__":
     command()

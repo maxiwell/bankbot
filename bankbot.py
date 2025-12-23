@@ -34,7 +34,7 @@ class BankBot:
                  workspace = str(Path.home()) + "/bankbot"):
         self.headless  = headless
         self.workspace = workspace
-        self.pause_if_error = False
+        self.pause_if_error = True
         self.debug = debug
         self.logfile = workspace + "/bankbot.log"
 
@@ -119,8 +119,12 @@ class BankBot:
             print(f"Headers: {request.headers}")
             print("-" * 80)
 
+        def log_response(response):
+            print(f"Response: {response.url}, Status: {response.status}, Text: {response.text}")
+
         if self.debug:
             self.page.on("request", log_request)
+            self.page.on("response", log_response)
 
         # Set the default timeout for all operations
         self.page.set_default_timeout(20000)
