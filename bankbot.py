@@ -127,7 +127,7 @@ class BankBot:
             self.page.on("response", log_response)
 
         # Set the default timeout for all operations
-        self.page.set_default_timeout(20000)
+        self.page.set_default_timeout(30000)
 
         return self.page
 

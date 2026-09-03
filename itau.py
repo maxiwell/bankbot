@@ -62,7 +62,10 @@ class Itau(BankBot):
 
         page.wait_for_selector('button#idl-more-access-submit-button:not([disabled])')
         page.click('button#idl-more-access-submit-button')
-        page.wait_for_load_state('networkidle')
+
+        # 'networkidle' nunca dispara de forma confiável no Itau (a pagina
+        # mantem polling/analytics); espera direto pelo teclado de senha
+        page.wait_for_selector('.teclas.clearfix a', timeout=60000)
 
         print("typing password")
         self.__enter_password(page, senha)
@@ -72,13 +75,13 @@ class Itau(BankBot):
         show_button = '#saldo-extrato-card-accordion'
         ver_extrato = 'button[aria-label="ver extrato"]'
 
-        time.sleep(random.randint(3,5))
+        # espera o dashboard renderizar o botao ou o accordion, o que vier primeiro
+        page.wait_for_selector(f'{ver_extrato}, {show_button}', timeout=60000)
+        time.sleep(random.randint(2,4))
 
         if not page.is_visible(ver_extrato):
-            page.wait_for_selector(show_button)
             page.click(show_button)
 
-        page.wait_for_load_state('domcontentloaded')
         page.wait_for_selector(ver_extrato)
 
         page.click(ver_extrato)
@@ -120,27 +123,28 @@ class Itau(BankBot):
             return self.save_file_from_page(download_info, filename)
 
 
-    def __get_credit_card(self, page):
-        time.sleep(random.randint(3,5))
+    def __open_cards_page(self, page):
         page.get_by_role("link", name=" menu").hover()
         page.get_by_role("link", name="cartões").click()
 
-        time.sleep(random.randint(1,3))
-        #page.locator("#detalharCartao0").click()
+        # espera a lista de cartoes renderizar ('attached', pois o container
+        # pode estar recolhido/invisivel)
+        page.locator("#conteudo0").wait_for(state='attached', timeout=60000)
+        time.sleep(random.randint(2,4))
 
-        time.sleep(random.randint(1,3))
-        page.locator("#conteudo0").get_by_role("link", name="ver fatura").click()
-
-        time.sleep(random.randint(4,7))
+    def __download_fatura(self, page, card_idx):
+        opcoes = page.locator("#botao-opcoes-lancamentos")
+        opcoes.wait_for(timeout=60000)
+        time.sleep(random.randint(2,4))
 
         # Mes Atual
-        page.locator("#botao-opcoes-lancamentos").click()
+        opcoes.click()
         with page.expect_download() as download_info:
 
             page.get_by_role("button", name="salvar em Excel").first.click()
             #page.get_by_role("button", name="salvar planilha").click()
 
-            filename = self.ofx_dir + "/" + self.create_filename(".xlsx")
+            filename = self.ofx_dir + "/" + self.create_filename(f"_card{card_idx}.xlsx")
             self.save_file_from_page(download_info, filename)
 
         ## Mes Anterior
@@ -152,6 +156,44 @@ class Itau(BankBot):
 
         #    filename = self.ofx_dir + "/" + self.create_filename("_fev.xlsx")
         #    self.save_file_from_page(download_info, filename)
+
+    def __get_credit_card(self, page):
+        self.__open_cards_page(page)
+
+        num_cards = 0
+        while page.locator(f"#conteudo{num_cards}").count() > 0:
+            num_cards += 1
+
+        self.log(f"Found {num_cards} credit card(s)")
+
+        for i in range(num_cards):
+            if i > 0:
+                # a pagina de fatura substitui a lista de cartoes; volta pelo menu
+                self.__open_cards_page(page)
+
+            card = page.locator(f"#conteudo{i}")
+            if card.count() == 0:
+                break
+
+            ver_fatura = card.get_by_role("link", name="ver fatura")
+
+            # cartoes recolhidos precisam ser expandidos antes
+            if not ver_fatura.is_visible():
+                expand = page.locator(f"#detalharCartao{i}")
+                if expand.count() > 0:
+                    expand.scroll_into_view_if_needed()
+                    expand.click()
+                    time.sleep(random.randint(1,2))
+
+            if not ver_fatura.is_visible():
+                self.log(f"Card {i}: 'ver fatura' not available, skipping")
+                continue
+
+            self.log(f"Card {i}: downloading fatura")
+            ver_fatura.scroll_into_view_if_needed()
+            ver_fatura.click()
+
+            self.__download_fatura(page, i)
 
     def exit(self, page):
         page.get_by_role("button", name=" sair").click()
